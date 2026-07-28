@@ -189,9 +189,10 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
     }
 
     // 无纵模式全局变量（仅一处声明，修复重复声明）
+    // 无纵模式全局变量（精简版）
     let noVerticalMode = cookie('noVerticalMode') ? cookie('noVerticalMode') === '1' : false;
-    let lastCell = -1;
-    let lastTwoRows = []; // 存储前两行所有音符，彻底杜绝纵向三连
+    let lastRowCell = -1; // 只存上一行音符列
+    let currentRowCell = -1; // 当前行音符列
     let _ttreg = / t{1,2}(\d+)/,
         _clearttClsReg = / t{1,2}\d+| bad/;
 
@@ -205,14 +206,15 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         _gameTimeNum = _gameSettingNum;
         _gameStartTime = 0;
         
-        lastCell = -1;
-        lastTwoRows = []; // 开局清空历史轨道
+        lastRowCell = -1;
+        currentRowCell = -1;
         
         countBlockSize();
         refreshGameLayer(GameLayer[0]);
         refreshGameLayer(GameLayer[1], 1);
         updatePanel();
     }
+
 
 
 
@@ -302,17 +304,17 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         let targetCell;
         if (noVerticalMode) {
             const all = [0,1,2,3];
-            // 过滤：上一个音符 + 前两行所有出现过的列
-            const avail = all.filter(c => c !== lastCell && !lastTwoRows.includes(c));
-            // 兜底防空数组报错
+            // 仅过滤上一行音符，保证上下两行绝不重复
+            const avail = all.filter(c => c !== lastRowCell);
             targetCell = avail.length > 0 ? avail[Math.floor(Math.random() * avail.length)] : Math.floor(Math.random() * 4);
-            lastCell = targetCell;
+            // 更新当前行音符
+            currentRowCell = targetCell;
         } else {
             targetCell = Math.floor(Math.random() * 1000) % 4;
+            currentRowCell = targetCell;
         }
         let i = targetCell + (loop ? 0 : 4);
     
-        let currentRowAllCells = [];
         for (let j = 0; j < box.children.length; j++) {
             let r = box.children[j], rstyle = r.style;
             rstyle.left = (j % 4) * blockSize + 'px';
@@ -325,7 +327,6 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
                     cell: i % 4,
                     id: r.id
                 });
-                currentRowAllCells.push(i % 4);
                 r.className += ' t' + (Math.floor(Math.random() * 1000) % 5 + 1);
                 r.notEmpty = true;
                 i = (Math.floor(j / 4) + 1) * 4 + Math.floor(Math.random() * 1000) % 4;
@@ -334,26 +335,17 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             }
         }
     
-        // 修复核心：统一更新历史行，区分滚动/初始刷新
+        // 滚动换行时：把当前行赋值给上一行，下一行生成自动避开
         if (loop) {
-            // 滚动生成新行：把当前生成行追加进历史，只保留最近两行
-            lastTwoRows = [...lastTwoRows, ...currentRowAllCells];
-            // 数组去重，只保留最近2行数据
-            lastTwoRows = [...new Set(lastTwoRows)];
-            if(lastTwoRows.length > 4) lastTwoRows.splice(0, lastTwoRows.length - 4);
-        } else {
-            // 初始刷新图层，重置历史记录
-            lastTwoRows = [...currentRowAllCells];
+            lastRowCell = currentRowCell;
         }
     
         if (loop) {
             box.style.webkitTransitionDuration = '0ms';
+            // 彻底移除 display:none / 延时display:block，图层永久可见，解决断层消失
             box.y = -blockSize * Math.floor(box.children.length / 4) + ((offset || 0)) * blockSize;
             setTimeout(function () {
                 box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
-                setTimeout(function () {
-                    box.style.display = 'block';
-                }, 100);
             }, 200);
         } else {
             box.y = 0;
@@ -361,6 +353,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         }
         box.style[transitionDuration] = '150ms';
     }
+
 
 
     function gameLayerMoveNextRow() {
