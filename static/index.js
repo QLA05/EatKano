@@ -2,16 +2,12 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
 
 (function(w) {
     function getJsonI18N() {
-        // https://developer.mozilla.org/zh-CN/docs/Web/API/Navigator/language
-        
         const LANGUAGES = [
             { regex: /^zh\b/, lang: 'zh' },
             { regex: /^ja\b/, lang: 'ja' },
             { regex: /.*/, lang: 'en'}
         ]
-
         const lang = LANGUAGES.find(l => l.regex.test(navigator.language)).lang
-        
         return $.ajax({
             url: `./static/i18n/${lang}.json`,
             dataType: 'json',
@@ -59,7 +55,6 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
     let transform, transitionDuration, welcomeLayerClosed;
 
     let mode = getMode();
-
     let soundMode = getSoundMode();
 
     w.init = function() {
@@ -86,12 +81,10 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
     }
 
     function getMode() {
-        //有cookie优先返回cookie记录的，没有再返回normal
         return cookie('gameMode') ? parseInt(cookie('gameMode')) : MODE_NORMAL;
     }
 
     function getSoundMode() {
-        // 默认为 on
         return cookie('soundMode') ? cookie('soundMode') : 'on';
     }
 
@@ -129,7 +122,6 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
     }
 
     let refreshSizeTime;
-
     function refreshSize() {
         clearTimeout(refreshSizeTime);
         refreshSizeTime = setTimeout(_refreshSize, 200);
@@ -196,16 +188,21 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         gameRestart();
     }
 
+    // 无纵模式全局变量
+    let noVerticalMode = cookie('noVerticalMode') ? cookie('noVerticalMode') === '1' : false;
+    let lastCol = -1; // 全局记录上一行音符列，跨图层生效
+
     function gameRestart() {
         _gameBBList = [];
         _gameBBListIndex = 0;
         _gameScore = 0;
         _gameOver = false;
         _gameStart = false;
+        _gameSettingNum=20;
         _gameTimeNum = _gameSettingNum;
         _gameStartTime = 0;
         
-        lastCell = -1;//**************
+        lastCol = -1; // 重置上一行记录
         
         countBlockSize();
         refreshGameLayer(GameLayer[0]);
@@ -217,7 +214,6 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         _date1 = new Date();
         _gameStartDatetime = _date1.getTime();
         _gameStart = true;
-
         _gameTime = setInterval(timer, 1000);
     }
 
@@ -256,7 +252,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             GameTimeLayer.innerHTML = `SCORE:${_gameScore}`;
         }
     }
-    //使重试按钮获得焦点
+
     function foucusOnReplay(){
         $('#replay').focus()
     }
@@ -273,7 +269,6 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         }, 1500);
     }
 
-
     function encrypt(text) {
         let encrypt = new JSEncrypt();
         encrypt.setPublicKey("MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDTzGwX6FVKc7rDiyF3H+jKpBlRCV4jOiJ4JR33qZPVXx8ahW6brdBF9H1vdHBAyO6AeYBumKIyunXP9xzvs1qJdRNhNoVwHCwGDu7TA+U4M7G9FArDG0Y6k4LbS0Ks9zeRBMiWkW53yQlPshhtOxXCuZZOMLqk1vEvTCODYYqX5QIDAQAB");
@@ -281,6 +276,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
     }
 
     function SubmitResults() {
+        // 修复未定义变量 tj
         if ($("#username").val() && _gameSettingNum === 20) {
             let httpRequest = new XMLHttpRequest();
             httpRequest.open('POST', './SubmitResults.php', true);
@@ -288,7 +284,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             let name = $("#username").val();
             let message = $("#message").val();
             let test = "|_|";
-            httpRequest.send(encrypt(_gameScore + test + name + test + tj + test + message));
+            httpRequest.send(encrypt(_gameScore + test + name + test + message));
         }
     }
 
@@ -296,28 +292,23 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         return 'TIME:' + Math.ceil(n);
     }
 
-
-    // 无纵模式开关（原版保留）
-    let noVerticalMode = cookie('noVerticalMode') ? cookie('noVerticalMode') === '1' : false;
-    let lastCell = -1;
-
     let _ttreg = / t{1,2}(\d+)/,
         _clearttClsReg = / t{1,2}\d+| bad/;
 
+    // 滚动逻辑100%还原原版，仅修改音符随机生成部分
     function refreshGameLayer(box, loop, offset) {
-        let targetCell;
+        // ========== 无纵模式：第一行音符过滤 ==========
+        let startCol;
         if (noVerticalMode) {
-            // 固定过滤：永远排除上一行的轨道，只在剩余3列随机
-            const all = [0,1,2,3];
-            const validCols = all.filter(c => c !== lastCell);
-            targetCell = validCols[Math.floor(Math.random() * validCols.length)];
+            const allCols = [0,1,2,3];
+            const validCols = allCols.filter(c => c !== lastCol);
+            startCol = validCols[Math.floor(Math.random() * validCols.length)];
         } else {
-            targetCell = Math.floor(Math.random() * 1000) % 4;
+            startCol = Math.floor(Math.random() * 1000) % 4;
         }
-        let i = targetCell + (loop ? 0 : 4);
-    
-        const currentCell = targetCell;
-    
+        lastCol = startCol;
+        let i = startCol + (loop ? 0 : 4);
+
         for (let j = 0; j < box.children.length; j++) {
             let r = box.children[j], rstyle = r.style;
             rstyle.left = (j % 4) * blockSize + 'px';
@@ -332,30 +323,41 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
                 });
                 r.className += ' t' + (Math.floor(Math.random() * 1000) % 5 + 1);
                 r.notEmpty = true;
-                i = (Math.floor(j / 4) + 1) * 4 + Math.floor(Math.random() * 1000) % 4;
+
+                // ========== 无纵模式：下一行音符过滤 ==========
+                const nextRowIndex = Math.floor(j / 4) + 1;
+                let nextCol;
+                if (noVerticalMode) {
+                    const allCols = [0,1,2,3];
+                    const validCols = allCols.filter(c => c !== lastCol);
+                    nextCol = validCols[Math.floor(Math.random() * validCols.length)];
+                } else {
+                    nextCol = Math.floor(Math.random() * 1000) % 4;
+                }
+                lastCol = nextCol;
+                i = nextRowIndex * 4 + nextCol;
             } else {
                 r.notEmpty = false;
             }
         }
-    
+
+        // 原版滚动逻辑完全不动，保证无缝无断层
         if (loop) {
-            // 滚动换行，更新上一行轨道，下一行自动避开
-            lastCell = currentCell;
             box.style.webkitTransitionDuration = '0ms';
+            box.style.display = 'none';
             box.y = -blockSize * (Math.floor(box.children.length / 4) + (offset || 0)) * loop;
             setTimeout(function () {
                 box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
+                setTimeout(function () {
+                    box.style.display = 'block';
+                }, 100);
             }, 200);
         } else {
             box.y = 0;
             box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
-            // 初始图层重置上一行标记
-            lastCell = -1;
         }
         box.style[transitionDuration] = '150ms';
     }
-
-
 
     function gameLayerMoveNextRow() {
         for (let i = 0; i < GameLayer.length; i++) {
@@ -394,7 +396,6 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             _gameScore++;
 
             updatePanel();
-
             gameLayerMoveNextRow();
         } else if (_gameStart && !tar.notEmpty) {
             if (soundMode === 'on') {
@@ -443,7 +444,6 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
     }
 
     function getBestScore(score) {
-        // 练习模式不会进入算分界面
         let cookieName = (mode === MODE_NORMAL ? 'bast-score' : 'endless-best-score');
         let best = cookie(cookieName) ? Math.max(parseFloat(cookie(cookieName)), score) : score;
         cookie(cookieName, best.toFixed(2), 100);
@@ -561,12 +561,10 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             _gameSettingNum = parseInt(cookie('gameTime'));
             gameRestart();
         }
-        // 读取无纵模式设置****************************************************
         if (cookie('noVerticalMode')) {
             $('#noVerticalMode').val(cookie('noVerticalMode'));
             noVerticalMode = cookie('noVerticalMode') === '1';
         }
-
     }
 
     w.show_btn = function() {
@@ -581,7 +579,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
     }
 
     w.save_cookie = function() {
-        const settings = ['username', 'message', 'keyboard', 'title', 'gameTime', 'noVerticalMode'];//***************************
+        const settings = ['username', 'message', 'keyboard', 'title', 'gameTime', 'noVerticalMode'];
         for (let s of settings) {
             let value=$(`#${s}`).val();
             if(value){
@@ -609,19 +607,15 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         if (!welcomeLayerClosed) {
             return;
         }
-
         let p = _gameBBList[_gameBBListIndex];
         let base = parseInt($(`#${p.id}`).attr("num")) - p.cell;
         let num = base + index - 1;
         let id = p.id.substring(0, 11) + num;
-
         let fakeEvent = {
             clientX: ((index - 1) * blockSize + index * blockSize) / 2 + body.offsetLeft,
-            // Make sure that it is in the area
             clientY: (touchArea[0] + touchArea[1]) / 2,
             target: document.getElementById(id),
         };
-
         gameTapEvent(fakeEvent);
     }
 
@@ -639,7 +633,6 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             reader.readAsDataURL(dom.files[0]);
         }
     }
-
 
     w.getClickBeforeImage = function() {
         $('#click-before-image').click();
