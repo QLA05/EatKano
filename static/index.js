@@ -188,9 +188,9 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         gameRestart();
     }
 
-    // 无纵模式开关+历史禁止列集合
+
     let noVerticalMode = cookie('noVerticalMode') ? cookie('noVerticalMode') === '1' : false;
-    let forbiddenCols = new Set(); // 存储所有不能生成的列，整行滚完再清除
+    let lastRowCell = -1; // 仅记录上一行音符列
     let _ttreg = / t{1,2}(\d+)/,
         _clearttClsReg = / t{1,2}\d+| bad/;
 
@@ -204,13 +204,14 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         _gameTimeNum = _gameSettingNum;
         _gameStartTime = 0;
         
-        forbiddenCols.clear(); // 清空禁止列
+        lastRowCell = -1;
         
         countBlockSize();
         refreshGameLayer(GameLayer[0]);
         refreshGameLayer(GameLayer[1], 1);
         updatePanel();
     }
+
 
 
 
@@ -302,17 +303,15 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         let targetCell;
         if (noVerticalMode) {
             const all = [0,1,2,3];
-            // 过滤所有禁止列，保证不和屏幕内任何现有音符同列
-            const avail = all.filter(c => !forbiddenCols.has(c));
-            // 兜底：全部被占用时随机
-            targetCell = avail.length > 0 ? avail[Math.floor(Math.random() * avail.length)] : Math.floor(Math.random() * 4);
+            // 过滤上一行轨道，保证相邻两行不同列
+            const avail = all.filter(c => c !== lastRowCell);
+            targetCell = avail.length ? avail[Math.floor(Math.random() * avail.length)] : Math.floor(Math.random() * 4);
         } else {
             targetCell = Math.floor(Math.random() * 1000) % 4;
         }
         let i = targetCell + (loop ? 0 : 4);
-    
-        // 清空本行标记，记录本次生成的轨道
         let currentCell = targetCell;
+    
         for (let j = 0; j < box.children.length; j++) {
             let r = box.children[j], rstyle = r.style;
             rstyle.left = (j % 4) * blockSize + 'px';
@@ -333,42 +332,47 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             }
         }
     
-        // 无纵模式：加入禁止生成列表
-        if (noVerticalMode) {
-            forbiddenCols.add(currentCell);
+        // 换行时更新上一行记录
+        if(loop){
+            lastRowCell = currentCell;
         }
     
-        // 【核心修复断层】删除所有延时、display隐藏代码，同步位移无空白
+        // 移除所有延时、display控制，无任何隐藏操作
+        box.style.webkitTransitionDuration = '0ms';
         if (loop) {
-            box.style.webkitTransitionDuration = '0ms';
             box.y = -blockSize * Math.floor(box.children.length / 4) + ((offset || 0)) * blockSize;
-            // 无嵌套延时，直接设置位移，图层全程可见，无断层空白
-            box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
-            // 该行完全滚动到可视区域外后，解除轨道禁止
-            setTimeout(()=>{
-                forbiddenCols.delete(currentCell);
-            }, 2500);
         } else {
             box.y = 0;
-            box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
         }
+        box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
         box.style[transitionDuration] = '150ms';
     }
 
 
 
 
+
     function gameLayerMoveNextRow() {
-        for (let i = 0; i < GameLayer.length; i++) {
-            let g = GameLayer[i];
-            g.y += blockSize;
-            if (g.y > blockSize * (Math.floor(g.children.length / 4))) {
-                refreshGameLayer(g, 1, -1);
-            } else {
-                g.style[transform] = 'translate3D(0,' + g.y + 'px,0)';
-            }
+        const layer1 = GameLayer[0];
+        const layer2 = GameLayer[1];
+        const maxHeight = blockSize * Math.floor(layer1.children.length / 4);
+        // 同步增加两行位移
+        layer1.y += blockSize;
+        layer2.y += blockSize;
+    
+        // 判断哪个图层超出屏幕，单独刷新，另一图层保持同步位移
+        if (layer1.y > maxHeight) {
+            refreshGameLayer(layer1, 1, -1);
+        } else {
+            layer1.style[transform] = 'translate3D(0,' + layer1.y + 'px,0)';
+        }
+        if (layer2.y > maxHeight) {
+            refreshGameLayer(layer2, 1, -1);
+        } else {
+            layer2.style[transform] = 'translate3D(0,' + layer2.y + 'px,0)';
         }
     }
+
 
     function gameTapEvent(e) {
         if (_gameOver) {
