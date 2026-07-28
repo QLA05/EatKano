@@ -188,11 +188,9 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         gameRestart();
     }
 
-    // 无纵模式全局变量（仅一处声明，修复重复声明）
-    // 无纵模式全局变量（精简版）
+    // 无纵模式开关+历史禁止列集合
     let noVerticalMode = cookie('noVerticalMode') ? cookie('noVerticalMode') === '1' : false;
-    let lastRowCell = -1; // 只存上一行音符列
-    let currentRowCell = -1; // 当前行音符列
+    let forbiddenCols = new Set(); // 存储所有不能生成的列，整行滚完再清除
     let _ttreg = / t{1,2}(\d+)/,
         _clearttClsReg = / t{1,2}\d+| bad/;
 
@@ -206,14 +204,14 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         _gameTimeNum = _gameSettingNum;
         _gameStartTime = 0;
         
-        lastRowCell = -1;
-        currentRowCell = -1;
+        forbiddenCols.clear(); // 清空禁止列
         
         countBlockSize();
         refreshGameLayer(GameLayer[0]);
         refreshGameLayer(GameLayer[1], 1);
         updatePanel();
     }
+
 
 
 
@@ -304,17 +302,17 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         let targetCell;
         if (noVerticalMode) {
             const all = [0,1,2,3];
-            // 仅过滤上一行音符，保证上下两行绝不重复
-            const avail = all.filter(c => c !== lastRowCell);
+            // 过滤所有禁止列，保证不和屏幕内任何现有音符同列
+            const avail = all.filter(c => !forbiddenCols.has(c));
+            // 兜底：全部被占用时随机
             targetCell = avail.length > 0 ? avail[Math.floor(Math.random() * avail.length)] : Math.floor(Math.random() * 4);
-            // 更新当前行音符
-            currentRowCell = targetCell;
         } else {
             targetCell = Math.floor(Math.random() * 1000) % 4;
-            currentRowCell = targetCell;
         }
         let i = targetCell + (loop ? 0 : 4);
     
+        // 清空本行标记，记录本次生成的轨道
+        let currentCell = targetCell;
         for (let j = 0; j < box.children.length; j++) {
             let r = box.children[j], rstyle = r.style;
             rstyle.left = (j % 4) * blockSize + 'px';
@@ -335,24 +333,28 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             }
         }
     
-        // 滚动换行时：把当前行赋值给上一行，下一行生成自动避开
-        if (loop) {
-            lastRowCell = currentRowCell;
+        // 无纵模式：加入禁止生成列表
+        if (noVerticalMode) {
+            forbiddenCols.add(currentCell);
         }
     
+        // 【核心修复断层】删除所有延时、display隐藏代码，同步位移无空白
         if (loop) {
             box.style.webkitTransitionDuration = '0ms';
-            // 彻底移除 display:none / 延时display:block，图层永久可见，解决断层消失
             box.y = -blockSize * Math.floor(box.children.length / 4) + ((offset || 0)) * blockSize;
-            setTimeout(function () {
-                box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
-            }, 200);
+            // 无嵌套延时，直接设置位移，图层全程可见，无断层空白
+            box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
+            // 该行完全滚动到可视区域外后，解除轨道禁止
+            setTimeout(()=>{
+                forbiddenCols.delete(currentCell);
+            }, 2500);
         } else {
             box.y = 0;
             box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
         }
         box.style[transitionDuration] = '150ms';
     }
+
 
 
 
