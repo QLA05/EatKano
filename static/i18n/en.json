@@ -4,6 +4,7 @@
   "normal": "Normal",
   "endless": "Endless",
   "practice": "Practice",
+  "no-vertical-mode":"No Vertical Mode (No consecutive same lane)","off":"Off","on":"On",
   "settings": "Settings",
   "img-before": "Img-before",
   "img-after": "Img-after",
