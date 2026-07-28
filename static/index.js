@@ -305,14 +305,16 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
 
     function refreshGameLayer(box, loop, offset) {
         let targetCell;
-        // 无纵模式：不能和上一行轨道相同
+        // 无纵模式：禁止和上一行轨道重复
         if (noVerticalMode) {
             const all = [0,1,2,3];
+            // 过滤掉上一行使用的轨道
             const avail = all.filter(c => c !== lastCell);
             targetCell = avail[Math.floor(Math.random() * avail.length)];
+            // 更新本行轨道给下一行做判断
             lastCell = targetCell;
         } else {
-            // 原版随机
+            // 原版随机逻辑
             targetCell = Math.floor(Math.random() * 1000) % 4;
         }
         let i = targetCell + (loop ? 0 : 4);
@@ -331,6 +333,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
                 });
                 r.className += ' t' + (Math.floor(Math.random() * 1000) % 5 + 1);
                 r.notEmpty = true;
+                // 下一行音符独立随机，不受本行限制
                 i = (Math.floor(j / 4) + 1) * 4 + Math.floor(Math.random() * 1000) % 4;
             } else {
                 r.notEmpty = false;
@@ -339,7 +342,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         if (loop) {
             box.style.webkitTransitionDuration = '0ms';
             box.style.display = 'none';
-            box.y = -blockSize * (Math.floor(box.children.length / 4) + (offset || 0)) * loop;
+            box.y = -blockSize * Math.floor(box.children.length / 4) + ((offset || 0)) * blockSize;
             setTimeout(function () {
                 box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
                 setTimeout(function () {
@@ -352,6 +355,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         }
         box.style[transitionDuration] = '150ms';
     }
+
 
 
     function gameLayerMoveNextRow() {
