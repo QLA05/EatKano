@@ -204,6 +204,9 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         _gameStart = false;
         _gameTimeNum = _gameSettingNum;
         _gameStartTime = 0;
+        
+        lastCell = -1;//**************
+        
         countBlockSize();
         refreshGameLayer(GameLayer[0]);
         refreshGameLayer(GameLayer[1], 1);
@@ -292,6 +295,10 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
     function createTimeText(n) {
         return 'TIME:' + Math.ceil(n);
     }
+
+    // 无纵模式开关*******************************************
+    let noVerticalMode = cookie('noVerticalMode') ? cookie('noVerticalMode') === '1' : false;
+    let lastCell = -1; // 记录上一行音符轨道，避免重复
 
     let _ttreg = / t{1,2}(\d+)/,
         _clearttClsReg = / t{1,2}\d+| bad/;
@@ -538,6 +545,12 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             _gameSettingNum = parseInt(cookie('gameTime'));
             gameRestart();
         }
+        // 读取无纵模式设置****************************************************
+        if (cookie('noVerticalMode')) {
+            $('#noVerticalMode').val(cookie('noVerticalMode'));
+            noVerticalMode = cookie('noVerticalMode') === '1';
+        }
+
     }
 
     w.show_btn = function() {
@@ -552,7 +565,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
     }
 
     w.save_cookie = function() {
-        const settings = ['username', 'message', 'keyboard', 'title', 'gameTime'];
+        const settings = ['username', 'message', 'keyboard', 'title', 'gameTime', 'noVerticalMode'];//***************************
         for (let s of settings) {
             let value=$(`#${s}`).val();
             if(value){
