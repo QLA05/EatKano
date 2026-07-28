@@ -196,6 +196,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         gameRestart();
     }
 
+    //*************************************************************************************************
     function gameRestart() {
         _gameBBList = [];
         _gameBBListIndex = 0;
@@ -207,13 +208,14 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         _gameStartTime = 0;
         
         lastCell = -1;
-        prevRowCells = []; // 重置整行轨道记录
+        lastFullRowCells = []; // 重置整行记录
         
         countBlockSize();
         refreshGameLayer(GameLayer[0]);
         refreshGameLayer(GameLayer[1], 1);
         updatePanel();
-}
+    }
+
 
     function gameStart() {
         _date1 = new Date();
@@ -298,31 +300,32 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         return 'TIME:' + Math.ceil(n);
     }
 
-    // 无纵模式开关*******************************************
+    // 无纵模式开关**********************************************************************************************************************************
     let noVerticalMode = cookie('noVerticalMode') ? cookie('noVerticalMode') === '1' : false;
-    let lastCell = -1; // 记录上一行音符轨道，避免重复
-    let prevRowCells = []; // 存储上一整行所有音符轨道，过滤整行重复
-
+    let lastCell = -1;
+    let lastFullRowCells = []; // 存储上一整行所有音符
+    
     let _ttreg = / t{1,2}(\d+)/,
         _clearttClsReg = / t{1,2}\d+| bad/;
 
     function refreshGameLayer(box, loop, offset) {
         let targetCell;
-        // 无纵模式：排除上一整行所有轨道 + 当前行上一个音符轨道
+        // 无纵模式：过滤上一整行所有轨道 + 当前行上一个音符
         if (noVerticalMode) {
             const all = [0,1,2,3];
-            // 过滤掉上一行全部音符，保证本行和上一行无任何同列
-            const avail = all.filter(c => c !== lastCell && !prevRowCells.includes(c));
+            const avail = all.filter(c => c !== lastCell && !lastFullRowCells.includes(c));
             targetCell = avail[Math.floor(Math.random() * avail.length)];
             lastCell = targetCell;
-            prevRowCells.push(targetCell); // 存入当前行轨道
         } else {
             targetCell = Math.floor(Math.random() * 1000) % 4;
         }
         let i = targetCell + (loop ? 0 : 4);
     
+        // 清空本行记录，重新存储当前行所有音符
+        let currentRowCells = [];
         for (let j = 0; j < box.children.length; j++) {
-            let r = box.children[j], rstyle = r.style;
+            let r = box.children[j],
+                rstyle = r.style;
             rstyle.left = (j % 4) * blockSize + 'px';
             rstyle.bottom = Math.floor(j / 4) * blockSize + 'px';
             rstyle.width = blockSize + 'px';
@@ -333,6 +336,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
                     cell: i % 4,
                     id: r.id
                 });
+                currentRowCells.push(i % 4); // 记录本行音符
                 r.className += ' t' + (Math.floor(Math.random() * 1000) % 5 + 1);
                 r.notEmpty = true;
                 i = (Math.floor(j / 4) + 1) * 4 + Math.floor(Math.random() * 1000) % 4;
@@ -340,16 +344,17 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
                 r.notEmpty = false;
             }
         }
-        // 换行逻辑：切换行时清空上一行记录
+        // 刷新完成，把当前行全部音符存入全局，给下一行过滤
+        lastFullRowCells = [...currentRowCells];
+    
         if (loop) {
-            prevRowCells = []; // 滚动新空白行，重置整行记录
             box.style.webkitTransitionDuration = '0ms';
             box.style.display = 'none';
             box.y = -blockSize * Math.floor(box.children.length / 4) + ((offset || 0)) * blockSize;
             setTimeout(function () {
                 box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
                 setTimeout(function () {
-                    box.style.display = 'none';
+                    box.style.display = 'block'; // 修复音符消失bug，恢复block
                 }, 100);
             }, 200);
         } else {
@@ -358,7 +363,6 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         }
         box.style[transitionDuration] = '150ms';
     }
-
 
 
 
