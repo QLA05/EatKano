@@ -205,15 +205,16 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         _gameTimeNum = _gameSettingNum;
         _gameStartTime = 0;
         
-        // 重置无纵模式记录
         lastCell = -1;
-        lastTwoRows = [];
+        lastTwoRows = []; // 开局清空历史轨道
         
         countBlockSize();
         refreshGameLayer(GameLayer[0]);
         refreshGameLayer(GameLayer[1], 1);
         updatePanel();
     }
+
+
 
     function gameStart() {
         _date1 = new Date();
@@ -301,9 +302,9 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         let targetCell;
         if (noVerticalMode) {
             const all = [0,1,2,3];
-            // 过滤前两行所有轨道 + 当前上一个音符
+            // 过滤：上一个音符 + 前两行所有出现过的列
             const avail = all.filter(c => c !== lastCell && !lastTwoRows.includes(c));
-            // 兜底：可用数组为空时随机一列，防止undefined报错
+            // 兜底防空数组报错
             targetCell = avail.length > 0 ? avail[Math.floor(Math.random() * avail.length)] : Math.floor(Math.random() * 4);
             lastCell = targetCell;
         } else {
@@ -325,7 +326,6 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
                     id: r.id
                 });
                 currentRowAllCells.push(i % 4);
-                // 修复：只生成t1~t5，不生成不存在的t6-t9
                 r.className += ' t' + (Math.floor(Math.random() * 1000) % 5 + 1);
                 r.notEmpty = true;
                 i = (Math.floor(j / 4) + 1) * 4 + Math.floor(Math.random() * 1000) % 4;
@@ -333,18 +333,21 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
                 r.notEmpty = false;
             }
         }
-        // 更新前两行记录，始终保存最近两行全部音符
-        if(loop){
-            lastTwoRows = [...currentRowAllCells];
-        }else{
+    
+        // 修复核心：统一更新历史行，区分滚动/初始刷新
+        if (loop) {
+            // 滚动生成新行：把当前生成行追加进历史，只保留最近两行
             lastTwoRows = [...lastTwoRows, ...currentRowAllCells];
-            // 去重，避免数组无限膨胀
+            // 数组去重，只保留最近2行数据
             lastTwoRows = [...new Set(lastTwoRows)];
+            if(lastTwoRows.length > 4) lastTwoRows.splice(0, lastTwoRows.length - 4);
+        } else {
+            // 初始刷新图层，重置历史记录
+            lastTwoRows = [...currentRowAllCells];
         }
     
         if (loop) {
             box.style.webkitTransitionDuration = '0ms';
-            // 核心修复：移除box.style.display = 'none'，图层全程可见，不会空白消失
             box.y = -blockSize * Math.floor(box.children.length / 4) + ((offset || 0)) * blockSize;
             setTimeout(function () {
                 box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
@@ -358,6 +361,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         }
         box.style[transitionDuration] = '150ms';
     }
+
 
     function gameLayerMoveNextRow() {
         for (let i = 0; i < GameLayer.length; i++) {
