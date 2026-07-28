@@ -190,10 +190,9 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
 
     // ========== 无纵连模式全局状态 ==========
     let noVerticalMode = false;
-    let lastNoteColumn = -1; // 全局追踪上一个音符列，跨图层生效
+    let lastNoteColumn = -1;
     let noVerticalInitialized = false;
 
-    // 安全读取无纵连Cookie
     function refreshNoVerticalMode() {
         const cookieVal = cookie('noVerticalMode');
         noVerticalMode = cookieVal === '1';
@@ -209,7 +208,6 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         _gameTimeNum = _gameSettingNum;
         _gameStartTime = 0;
         
-        // 重置无纵连全局状态
         lastNoteColumn = -1;
         noVerticalInitialized = false;
         refreshNoVerticalMode();
@@ -304,31 +302,24 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
     let _ttreg = / t{1,2}(\d+)/,
         _clearttClsReg = / t{1,2}\d+| bad/;
 
-    // ========== 加固版音符生成：无纵连全局生效，跨图层无衔接漏洞 ==========
     function refreshGameLayer(box, loop, offset) {
         let i;
         const totalRows = Math.floor(box.children.length / 4);
 
         if (noVerticalMode) {
-            // 初始状态先随机第一列
             if (!noVerticalInitialized) {
                 const allCols = [0, 1, 2, 3];
                 lastNoteColumn = allCols[Math.floor(Math.random() * allCols.length)];
                 noVerticalInitialized = true;
             }
-
-            // 第一行音符必须避开全局上一列
             const allCols = [0, 1, 2, 3];
             const validCols = allCols.filter(c => c !== lastNoteColumn);
             const startCol = validCols.length > 0
                 ? validCols[Math.floor(Math.random() * validCols.length)]
                 : Math.floor(Math.random() * 4);
-
             lastNoteColumn = startCol;
-            // 非循环图层从第二行开始（原版逻辑保留）
             i = startCol + (loop ? 0 : 4);
         } else {
-            // 关闭无纵连时完全走原版随机逻辑
             i = Math.floor(Math.random() * 4) + (loop ? 0 : 4);
         }
 
@@ -349,11 +340,9 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
                 r.className += ' t' + (Math.floor(Math.random() * 1000) % 5 + 1);
                 r.notEmpty = true;
 
-                // 计算下一行音符位置
                 const nextRowIndex = Math.floor(j / 4) + 1;
                 if (nextRowIndex < totalRows) {
                     if (noVerticalMode) {
-                        // 无纵连：下一行强制避开当前列
                         const allCols = [0, 1, 2, 3];
                         const validCols = allCols.filter(c => c !== currentCol);
                         const nextCol = validCols.length > 0
@@ -362,7 +351,6 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
                         lastNoteColumn = nextCol;
                         i = nextRowIndex * 4 + nextCol;
                     } else {
-                        // 原版随机逻辑
                         const nextCol = Math.floor(Math.random() * 4);
                         i = nextRowIndex * 4 + nextCol;
                     }
@@ -372,7 +360,6 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             }
         }
 
-        // 原版滚动逻辑完全保留，保证无缝滚动
         if (loop) {
             box.style.webkitTransitionDuration = '0ms';
             box.style.display = 'none';
@@ -543,13 +530,13 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         if (typeof obj === 'object') {
             return JSON.stringify(obj);
         } else {
-            return obj;
+            return obj + "";
         }
     }
 
     function cookie(name, value, time) {
         if (name) {
-            if (value !== undefined && value !== null && value !== '') {
+            if (value !== undefined && value !== null) {
                 if (time) {
                     let date = new Date();
                     date.setTime(date.getTime() + 864e5 * time), time = date.toGMTString();
@@ -571,12 +558,8 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
     document.write(createGameLayer());
 
     function initSetting() {
-        if ($("#username").length) {
-            $("#username").val(cookie("username") ? cookie("username") : "");
-        }
-        if ($("#message").length) {
-            $("#message").val(cookie("message") ? cookie("message") : "");
-        }
+        if ($("#username").length) $("#username").val(cookie("username") || "");
+        if ($("#message").length) $("#message").val(cookie("message") || "");
         if (cookie("title")) {
             $('title').text(cookie('title'));
             $('#title').val(cookie('title'));
@@ -595,7 +578,6 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             $('#gameTime').val(cookie('gameTime'));
             _gameSettingNum = parseInt(cookie('gameTime'));
         }
-        // 无纵连模式初始化
         refreshNoVerticalMode();
         if ($('#noVerticalMode').length) {
             $('#noVerticalMode').val(noVerticalMode ? '1' : '0');
@@ -613,23 +595,20 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         $('#sound').text(soundMode === 'on' ? I18N['sound-on'] : I18N['sound-off']);
     }
 
-    // ========== 修复版保存设置：容错处理 + 立即生效 ==========
+    // 【核心修复】完全容错保存设置，杜绝toString报错
     w.save_cookie = function() {
         const settings = ['username', 'message', 'keyboard', 'title', 'gameTime', 'noVerticalMode'];
         for (let s of settings) {
             const $elem = $(`#${s}`);
             if ($elem.length === 0) continue;
             let value = $elem.val();
-            // 关键修复：判断value是否存在再调用toString
-            if (value !== null && value !== undefined) {
-                cookie(s, String(value), 100);
-            }
+            // 安全转字符串，undefined/null不会报错
+            cookie(s, value, 100);
         }
         initSetting();
         refreshNoVerticalMode();
         gameRestart();
     }
-
 
     function isnull(val) {
         let str = val.replace(/(^\s*)|(\s*$)/g, '');
