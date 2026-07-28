@@ -88,6 +88,16 @@
                     </div>
                     <input data-placeholder-i18n="default-20s" type="text" id="gameTime" class="form-control" maxlength=4 placeholder="default-20s">
                 </div>
+                <!-- 新增：无纵连模式开关，位于时间选项下方 -->
+                <div class="input-group mb-3">
+                    <div class="input-group-prepend col-2">
+                        <span class="input-group-text">无纵连</span>
+                    </div>
+                    <div class="form-check form-switch d-flex align-items-center ps-3">
+                        <input class="form-check-input" type="checkbox" id="noChordMode">
+                        <label class="form-check-label ms-2" for="noChordMode">开启后禁止同列连续生成音符</label>
+                    </div>
+                </div>
                 <button type="button" class="btn btn-secondary btn-lg" onclick="show_btn();save_cookie();" data-i18n="ok">OK-I18N</button>
             </div>
         </div>
@@ -96,47 +106,112 @@
 
 <script src="./static/index.js"></script>
 
-<!-- 弹窗常驻修复补丁（不覆盖原有游戏逻辑，只做兜底增强） -->
+<!-- 修复补丁：弹窗常驻修复 + 无纵连模式逻辑 -->
 <script>
 (function() {
-    // 保存原有的按钮函数，不破坏原版游戏逻辑
-    const _originReplayBtn = window.replayBtn;
-    const _originBackBtn = window.backBtn;
+    // ========== 1. 结算弹窗常驻修复 ==========
+    // 保存原版原有函数，绝不破坏核心游戏逻辑
+    let _originReplayBtn = null;
+    let _originBackBtn = null;
+    let _originSaveCookie = null;
 
-    // 强制隐藏结算弹窗（jQuery + 原生DOM双重保险）
-    function forceHideModal() {
+    // 强制隐藏弹窗：原生DOM + jQuery双重保险，多次兜底避免渲染循环覆盖
+    function forceHideScoreLayer() {
         const layer = document.getElementById('GameScoreLayer');
         if (layer) {
             layer.style.display = 'none';
             layer.style.visibility = 'hidden';
         }
-        $('#GameScoreLayer').hide();
+        if (window.$) {
+            $('#GameScoreLayer').hide();
+        }
+        // 重置游戏结束状态，防止渲染循环再次触发弹窗显示
+        if (typeof _gameOver !== 'undefined') {
+            _gameOver = false;
+        }
     }
 
-    // 增强重来按钮：先执行原版完整重启逻辑，再强制隐藏弹窗兜底
-    window.replayBtn = function() {
-        // 执行原版原有逻辑（重置游戏、重启循环等完整流程）
-        if (typeof _originReplayBtn === 'function') {
-            _originReplayBtn();
-        }
+    // 等待原版脚本加载完成后再增强
+    window.addEventListener('load', function() {
+        // 增强重来按钮：先执行原版完整重启逻辑，再强制隐藏弹窗兜底
+        _originReplayBtn = window.replayBtn;
+        window.replayBtn = function() {
+            if (typeof _originReplayBtn === 'function') {
+                try { _originReplayBtn(); } catch(e) {}
+            }
+            // 多次延迟兜底，彻底避免渲染下一帧又弹出
+            forceHideScoreLayer();
+            setTimeout(forceHideScoreLayer, 30);
+            setTimeout(forceHideScoreLayer, 150);
+            setTimeout(forceHideScoreLayer, 300);
+        };
+
+        // 增强返回主页按钮
+        _originBackBtn = window.backBtn;
+        window.backBtn = function() {
+            if (typeof _originBackBtn === 'function') {
+                try { _originBackBtn(); } catch(e) {}
+            }
+            forceHideScoreLayer();
+            setTimeout(forceHideScoreLayer, 30);
+        };
+
+        // ========== 2. 无纵连模式逻辑 ==========
+        const noChordCheckbox = document.getElementById('noChordMode');
         
-        // 强制隐藏弹窗，分多次兜底，防止渲染循环瞬间覆盖
-        forceHideModal();
-        setTimeout(forceHideModal, 30);
-        setTimeout(forceHideModal, 150);
-    }
-
-    // 增强返回主页按钮
-    window.backBtn = function() {
-        if (typeof _originBackBtn === 'function') {
-            _originBackBtn();
+        // 读取Cookie初始化无纵连状态
+        function getCookie(name) {
+            const arr = document.cookie.match(new RegExp("(^| )" + name + "=([^;]*)(;|$)"));
+            return arr ? unescape(arr[2]) : null;
         }
-        forceHideModal();
-        setTimeout(forceHideModal, 30);
-    }
 
-    // 页面加载完成后，确保弹窗初始隐藏
-    $(document).ready(forceHideModal);
+        // 初始化状态
+        const savedNoChord = getCookie('noChordMode');
+        window._noChordMode = savedNoChord === '1';
+        if (noChordCheckbox) {
+            noChordCheckbox.checked = window._noChordMode;
+        }
+
+        // 增强保存Cookie逻辑，同步保存无纵连设置
+        _originSaveCookie = window.save_cookie;
+        window.save_cookie = function() {
+            if (typeof _originSaveCookie === 'function') {
+                try { _originSaveCookie(); } catch(e) {}
+            }
+            window._noChordMode = noChordCheckbox ? noChordCheckbox.checked : false;
+            document.cookie = `noChordMode=${window._noChordMode ? 1 : 0};path=/;max-age=31536000`;
+        };
+
+        // 无纵连核心逻辑：拦截音符生成，禁止同列连续
+        let _lastNoteColumn = -1;
+        const _originalPush = Array.prototype.push;
+        
+        // 监听音符列表，拦截同列连续音符
+        function initNoChordHook() {
+            if (typeof _gameBBList === 'undefined') return;
+            
+            _gameBBList.push = function(note) {
+                if (window._noChordMode && note && note.col !== undefined) {
+                    // 如果和上一个音符同列，重新随机一列
+                    if (note.col === _lastNoteColumn) {
+                        let newCol;
+                        do {
+                            newCol = Math.floor(Math.random() * 4);
+                        } while (newCol === _lastNoteColumn);
+                        note.col = newCol;
+                        // 同步更新音符X坐标（适配4列布局）
+                        const colWidth = this._colWidth || (game.canvas.width / 4);
+                        note.x = newCol * colWidth + colWidth / 2 - note.getBounds().width / 2;
+                    }
+                    _lastNoteColumn = note.col;
+                }
+                return _originalPush.apply(this, arguments);
+            };
+        }
+
+        // 游戏初始化后挂载拦截
+        setTimeout(initNoChordHook, 500);
+    });
 })();
 </script>
 </body>
