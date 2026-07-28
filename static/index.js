@@ -618,16 +618,18 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         const settings = ['username', 'message', 'keyboard', 'title', 'gameTime', 'noVerticalMode'];
         for (let s of settings) {
             const $elem = $(`#${s}`);
-            if ($elem.length === 0) continue; // 元素不存在则跳过，避免报错
+            if ($elem.length === 0) continue;
             let value = $elem.val();
-            if (value !== undefined && value !== null && value !== '') {
-                cookie(s, value.toString(), 100);
+            // 关键修复：判断value是否存在再调用toString
+            if (value !== null && value !== undefined) {
+                cookie(s, String(value), 100);
             }
         }
         initSetting();
-        refreshNoVerticalMode(); // 刷新无纵连状态
-        gameRestart(); // 立即重新生成谱面，设置即时生效
+        refreshNoVerticalMode();
+        gameRestart();
     }
+
 
     function isnull(val) {
         let str = val.replace(/(^\s*)|(\s*$)/g, '');
