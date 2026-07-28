@@ -189,8 +189,9 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
     }
 
 
+    // 无纵模式：仅记录上一行音符列
     let noVerticalMode = cookie('noVerticalMode') ? cookie('noVerticalMode') === '1' : false;
-    let lastRowCell = -1; // 仅记录上一行音符列
+    let lastRowCell = -1;
     let _ttreg = / t{1,2}(\d+)/,
         _clearttClsReg = / t{1,2}\d+| bad/;
 
@@ -211,6 +212,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         refreshGameLayer(GameLayer[1], 1);
         updatePanel();
     }
+
 
 
 
@@ -298,80 +300,83 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
     function createTimeText(n) {
         return 'TIME:' + Math.ceil(n);
     }
-
+    
     function refreshGameLayer(box, loop, offset) {
         let targetCell;
         if (noVerticalMode) {
-            const all = [0,1,2,3];
-            // 过滤上一行轨道，保证相邻两行不同列
-            const avail = all.filter(c => c !== lastRowCell);
-            targetCell = avail.length ? avail[Math.floor(Math.random() * avail.length)] : Math.floor(Math.random() * 4);
+            const allCols = [0,1,2,3];
+            // 强制过滤上一行轨道，相邻两行绝对不同列
+            const availableCols = allCols.filter(col => col !== lastRowCell);
+            targetCell = availableCols.length > 0 ? availableCols[Math.floor(Math.random() * availableCols.length)] : Math.floor(Math.random() * 4);
         } else {
             targetCell = Math.floor(Math.random() * 1000) % 4;
         }
-        let i = targetCell + (loop ? 0 : 4);
-        let currentCell = targetCell;
+        let cellIndex = targetCell + (loop ? 0 : 4);
+        const currentCell = targetCell;
     
+        // 重置方块样式，生成音符
         for (let j = 0; j < box.children.length; j++) {
-            let r = box.children[j], rstyle = r.style;
-            rstyle.left = (j % 4) * blockSize + 'px';
-            rstyle.bottom = Math.floor(j / 4) * blockSize + 'px';
-            rstyle.width = blockSize + 'px';
-            rstyle.height = blockSize + 'px';
-            r.className = r.className.replace(_clearttClsReg, '');
-            if (i === j) {
+            const block = box.children[j];
+            const blockStyle = block.style;
+            blockStyle.left = (j % 4) * blockSize + 'px';
+            blockStyle.bottom = Math.floor(j / 4) * blockSize + 'px';
+            blockStyle.width = blockSize + 'px';
+            blockStyle.height = blockSize + 'px';
+            block.className = block.className.replace(_clearttClsReg, '');
+            
+            if (cellIndex === j) {
                 _gameBBList.push({
-                    cell: i % 4,
-                    id: r.id
+                    cell: cellIndex % 4,
+                    id: block.id
                 });
-                r.className += ' t' + (Math.floor(Math.random() * 1000) % 5 + 1);
-                r.notEmpty = true;
-                i = (Math.floor(j / 4) + 1) * 4 + Math.floor(Math.random() * 1000) % 4;
+                block.className += ' t' + (Math.floor(Math.random() * 1000) % 5 + 1);
+                block.notEmpty = true;
+                cellIndex = (Math.floor(j / 4) + 1) * 4 + Math.floor(Math.random() * 1000) % 4;
             } else {
-                r.notEmpty = false;
+                block.notEmpty = false;
             }
         }
     
-        // 换行时更新上一行记录
-        if(loop){
-            lastRowCell = currentCell;
-        }
+        // 滚动换行时更新上一行记录，下一行自动避开该列
+        if(loop) lastRowCell = currentCell;
     
-        // 移除所有延时、display控制，无任何隐藏操作
+        // 完全删除延时、display隐藏代码，图层永久可见
         box.style.webkitTransitionDuration = '0ms';
         if (loop) {
             box.y = -blockSize * Math.floor(box.children.length / 4) + ((offset || 0)) * blockSize;
         } else {
             box.y = 0;
         }
-        box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
+        box.style[transform] = `translate3D(0,${box.y}px,0)`;
         box.style[transitionDuration] = '150ms';
     }
 
 
 
 
-
     function gameLayerMoveNextRow() {
-        const layer1 = GameLayer[0];
-        const layer2 = GameLayer[1];
-        const maxHeight = blockSize * Math.floor(layer1.children.length / 4);
-        // 同步增加两行位移
-        layer1.y += blockSize;
-        layer2.y += blockSize;
+        const layerA = GameLayer[0];
+        const layerB = GameLayer[1];
+        const rowHeight = blockSize;
+        const layerMaxY = rowHeight * Math.floor(layerA.children.length / 4);
     
-        // 判断哪个图层超出屏幕，单独刷新，另一图层保持同步位移
-        if (layer1.y > maxHeight) {
-            refreshGameLayer(layer1, 1, -1);
-        } else {
-            layer1.style[transform] = 'translate3D(0,' + layer1.y + 'px,0)';
-        }
-        if (layer2.y > maxHeight) {
-            refreshGameLayer(layer2, 1, -1);
-        } else {
-            layer2.style[transform] = 'translate3D(0,' + layer2.y + 'px,0)';
-        }
+        // 两层同步增加偏移量，永远保持相同y值
+        layerA.y += rowHeight;
+        layerB.y += rowHeight;
+    
+        // 统一判断、统一渲染，避免一层动一层不动
+        const refreshA = layerA.y > layerMaxY;
+        const refreshB = layerB.y > layerMaxY;
+    
+        // 先刷新超出边界的图层（重置坐标）
+        if(refreshA) refreshGameLayer(layerA, 1, -1);
+        if(refreshB) refreshGameLayer(layerB, 1, -1);
+    
+        // 同步给两个图层赋值位移，保证两层垂直位置完全一致，无间隙
+        layerA.style[transform] = `translate3D(0,${layerA.y}px,0)`;
+        layerB.style[transform] = `translate3D(0,${layerB.y}px,0)`;
     }
+
 
 
     function gameTapEvent(e) {
