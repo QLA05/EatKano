@@ -295,9 +295,9 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
     let _ttreg = / t{1,2}(\d+)/,
         _clearttClsReg = / t{1,2}\d+| bad/;
 
-    // 滚动逻辑100%还原原版，仅修改音符随机生成部分
+    // 滚动逻辑100%还原原版，无纵模式加固
     function refreshGameLayer(box, loop, offset) {
-        // ========== 无纵模式：第一行音符过滤 ==========
+        // 无纵模式：第一行音符必须避开上一图层最后一列
         let startCol;
         if (noVerticalMode) {
             const allCols = [0,1,2,3];
@@ -324,7 +324,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
                 r.className += ' t' + (Math.floor(Math.random() * 1000) % 5 + 1);
                 r.notEmpty = true;
 
-                // ========== 无纵模式：下一行音符过滤 ==========
+                // 无纵模式：下一行音符强制避开当前列
                 const nextRowIndex = Math.floor(j / 4) + 1;
                 let nextCol;
                 if (noVerticalMode) {
@@ -341,7 +341,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             }
         }
 
-        // 原版滚动逻辑完全不动，保证无缝无断层
+        // 原版滚动逻辑完全不动
         if (loop) {
             box.style.webkitTransitionDuration = '0ms';
             box.style.display = 'none';
@@ -559,8 +559,8 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         if (cookie('gameTime')) {
             $('#gameTime').val(cookie('gameTime'));
             _gameSettingNum = parseInt(cookie('gameTime'));
-            gameRestart();
         }
+        // 无纵连模式初始化
         if (cookie('noVerticalMode')) {
             $('#noVerticalMode').val(cookie('noVerticalMode'));
             noVerticalMode = cookie('noVerticalMode') === '1';
@@ -582,11 +582,12 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         const settings = ['username', 'message', 'keyboard', 'title', 'gameTime', 'noVerticalMode'];
         for (let s of settings) {
             let value=$(`#${s}`).val();
-            if(value){
+            if(value !== ''){
                 cookie(s, value.toString(), 100);
             }
         }
         initSetting();
+        gameRestart(); // 关键修复：保存设置后立即重新生成谱面，无纵连立即生效
     }
 
     function isnull(val) {
