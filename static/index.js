@@ -299,23 +299,24 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
 
     // 无纵模式开关（原版保留）
     let noVerticalMode = cookie('noVerticalMode') ? cookie('noVerticalMode') === '1' : false;
-    let lastCell = -1; // 记录上一行音符轨道，避免重复
+    let lastCell = -1;
 
     let _ttreg = / t{1,2}(\d+)/,
         _clearttClsReg = / t{1,2}\d+| bad/;
 
     function refreshGameLayer(box, loop, offset) {
         let targetCell;
-        // 无纵模式过滤逻辑，原版随机逻辑保留
         if (noVerticalMode) {
+            // 固定过滤：永远排除上一行的轨道，只在剩余3列随机
             const all = [0,1,2,3];
-            // 过滤上一行轨道，避免纵向重复
-            const avail = all.filter(c => c !== lastCell);
-            targetCell = avail.length > 0 ? avail[Math.floor(Math.random() * avail.length)] : Math.floor(Math.random() * 4);
+            const validCols = all.filter(c => c !== lastCell);
+            targetCell = validCols[Math.floor(Math.random() * validCols.length)];
         } else {
             targetCell = Math.floor(Math.random() * 1000) % 4;
         }
         let i = targetCell + (loop ? 0 : 4);
+    
+        const currentCell = targetCell;
     
         for (let j = 0; j < box.children.length; j++) {
             let r = box.children[j], rstyle = r.style;
@@ -336,22 +337,24 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
                 r.notEmpty = false;
             }
         }
-        // 换行刷新时，更新上一行轨道记录
+    
         if (loop) {
-            lastCell = targetCell;
-            // 原版位移逻辑完整保留，仅删除导致断层的display隐藏代码
+            // 滚动换行，更新上一行轨道，下一行自动避开
+            lastCell = currentCell;
             box.style.webkitTransitionDuration = '0ms';
             box.y = -blockSize * (Math.floor(box.children.length / 4) + (offset || 0)) * loop;
             setTimeout(function () {
                 box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
-                // 移除 box.style.display = 'none' / box.style.display = 'block' 彻底解决断层
             }, 200);
         } else {
             box.y = 0;
             box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
+            // 初始图层重置上一行标记
+            lastCell = -1;
         }
         box.style[transitionDuration] = '150ms';
     }
+
 
 
     function gameLayerMoveNextRow() {
