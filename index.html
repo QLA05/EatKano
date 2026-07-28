@@ -96,59 +96,48 @@
 
 <script src="./static/index.js"></script>
 
-<!-- 弹窗常驻修复脚本 -->
+<!-- 弹窗常驻修复补丁（不覆盖原有游戏逻辑，只做兜底增强） -->
 <script>
-    // 强制隐藏结算弹窗（双重保险：jQuery + 原生DOM，避免样式覆盖失效）
-    function hideGameScoreLayer() {
-        $('#GameScoreLayer').hide();
+(function() {
+    // 保存原有的按钮函数，不破坏原版游戏逻辑
+    const _originReplayBtn = window.replayBtn;
+    const _originBackBtn = window.backBtn;
+
+    // 强制隐藏结算弹窗（jQuery + 原生DOM双重保险）
+    function forceHideModal() {
         const layer = document.getElementById('GameScoreLayer');
         if (layer) {
             layer.style.display = 'none';
+            layer.style.visibility = 'hidden';
         }
+        $('#GameScoreLayer').hide();
     }
 
-    // 重写「重来」按钮逻辑
+    // 增强重来按钮：先执行原版完整重启逻辑，再强制隐藏弹窗兜底
     window.replayBtn = function() {
-        // 1. 立刻隐藏弹窗
-        hideGameScoreLayer();
-        
-        // 2. 重置游戏结束状态标志
-        if (typeof _gameOver !== 'undefined') {
-            _gameOver = false;
+        // 执行原版原有逻辑（重置游戏、重启循环等完整流程）
+        if (typeof _originReplayBtn === 'function') {
+            _originReplayBtn();
         }
         
-        // 3. 执行原有的游戏重启逻辑
-        if (typeof gameRestart === 'function') {
-            gameRestart();
-        }
-        
-        // 4. 延迟兜底隐藏，防止游戏渲染循环覆盖样式
-        setTimeout(hideGameScoreLayer, 50);
-        setTimeout(hideGameScoreLayer, 200);
+        // 强制隐藏弹窗，分多次兜底，防止渲染循环瞬间覆盖
+        forceHideModal();
+        setTimeout(forceHideModal, 30);
+        setTimeout(forceHideModal, 150);
     }
 
-    // 重写「返回主页」按钮逻辑
+    // 增强返回主页按钮
     window.backBtn = function() {
-        hideGameScoreLayer();
-        
-        if (typeof _gameOver !== 'undefined') {
-            _gameOver = false;
+        if (typeof _originBackBtn === 'function') {
+            _originBackBtn();
         }
-        
-        if (typeof gameRestart === 'function') {
-            gameRestart();
-        }
-        if (typeof showWelcomeLayer === 'function') {
-            showWelcomeLayer();
-        }
-        
-        setTimeout(hideGameScoreLayer, 50);
+        forceHideModal();
+        setTimeout(forceHideModal, 30);
     }
 
-    // 页面加载完成后，确保弹窗初始状态为隐藏
-    $(document).ready(function() {
-        hideGameScoreLayer();
-    });
+    // 页面加载完成后，确保弹窗初始隐藏
+    $(document).ready(forceHideModal);
+})();
 </script>
 </body>
 </html>
