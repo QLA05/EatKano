@@ -304,7 +304,19 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         _clearttClsReg = / t{1,2}\d+| bad/;
 
     function refreshGameLayer(box, loop, offset) {
-        let i = Math.floor(Math.random() * 1000) % 4 + (loop ? 0 : 4);
+        let targetCell;
+        // 无纵模式：不能和上一行轨道相同
+        if (noVerticalMode) {
+            const all = [0,1,2,3];
+            const avail = all.filter(c => c !== lastCell);
+            targetCell = avail[Math.floor(Math.random() * avail.length)];
+            lastCell = targetCell;
+        } else {
+            // 原版随机
+            targetCell = Math.floor(Math.random() * 1000) % 4;
+        }
+        let i = targetCell + (loop ? 0 : 4);
+    
         for (let j = 0; j < box.children.length; j++) {
             let r = box.children[j], rstyle = r.style;
             rstyle.left = (j % 4) * blockSize + 'px';
@@ -340,6 +352,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         }
         box.style[transitionDuration] = '150ms';
     }
+
 
     function gameLayerMoveNextRow() {
         for (let i = 0; i < GameLayer.length; i++) {
