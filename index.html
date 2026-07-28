@@ -78,17 +78,17 @@
                 </div>
                 <div class="input-group mb-3">
                     <div class="input-group-prepend col-2">
-                        <span data-i18n="key" class="input-group-text">KEY-I18N</span>
+                        <span class="input-group-text" data-i18n="key" class="input-group-text">KEY-I18N</span>
                     </div>
                     <input data-placeholder-i18n="default-dfjk" type="text" id="keyboard" class="form-control" maxlength=4 placeholder="DFJK-I18N">
                 </div>
                 <div class="input-group mb-3">
                     <div class="input-group-prepend col-2">
-                        <span data-i18n="time" class="input-group-text">TIME-I18N</span>
+                        <span class="input-group-text" data-i18n="time" class="input-group-text">TIME-I18N</span>
                     </div>
                     <input data-placeholder-i18n="default-20s" type="text" id="gameTime" class="form-control" maxlength=4 placeholder="default-20s">
                 </div>
-                <!-- 无纵连模式开关，完全对接原版index.js的noVerticalMode逻辑 -->
+                <!-- 无纵连模式开关，完全对接原版JS逻辑 -->
                 <div class="input-group mb-3">
                     <div class="input-group-prepend col-2">
                         <span class="input-group-text">无纵连</span>
@@ -96,7 +96,6 @@
                     <div class="form-check d-flex align-items-center ps-3">
                         <input class="form-check-input" type="checkbox" id="noVerticalSwitch">
                         <label class="form-check-label ms-2" for="noVerticalSwitch">开启后禁止同列连续出现音符</label>
-                        <!-- 隐藏输入框，兼容原版JS的读写逻辑，无需修改index.js -->
                         <input type="hidden" id="noVerticalMode" value="0">
                     </div>
                 </div>
@@ -108,47 +107,30 @@
 
 <script src="./static/index.js"></script>
 
-<!-- 修复补丁：弹窗常驻兜底 + 无纵连开关同步 -->
+<!-- 同步补丁：开关与隐藏值同步 + 弹窗重开兜底 -->
 <script>
 $(window).on('load', function() {
-    // ========== 1. 无纵连开关与原版逻辑同步 ==========
     const $switch = $('#noVerticalSwitch');
     const $hidden = $('#noVerticalMode');
 
-    // 初始化：读取原版JS写入的Cookie值，同步到复选框
+    // 初始化：同步Cookie值到复选框
     if ($hidden.val() === '1') {
         $switch.prop('checked', true);
     }
 
-    // 复选框切换时，同步值到隐藏输入框，完全兼容原版save_cookie逻辑
+    // 复选框切换时，同步值到隐藏输入框
     $switch.on('change', function() {
         $hidden.val($(this).prop('checked') ? '1' : '0');
     });
 
-    // ========== 2. 结算弹窗常驻彻底修复 ==========
+    // 重开弹窗兜底：多时段强制隐藏，覆盖1500ms延迟弹窗
     const _originalReplay = window.replayBtn;
-    const _originalBack = window.backBtn;
-
-    // 增强重来按钮：执行原版逻辑后，多时段兜底隐藏弹窗
     window.replayBtn = function() {
-        if (typeof _originalReplay === 'function') {
-            _originalReplay();
-        }
-        const hide = () => $('#GameScoreLayer').css('display', 'none');
-        setTimeout(hide, 10);   // 立即兜底
-        setTimeout(hide, 50);   // 渲染帧后兜底
-        setTimeout(hide, 200);  // 短延迟兜底
-        setTimeout(hide, 1600); // 覆盖gameOver的1500ms延迟弹窗，解决提前重开仍弹出的问题
-    };
-
-    // 增强返回主页按钮
-    window.backBtn = function() {
-        if (typeof _originalBack === 'function') {
-            _originalBack();
-        }
+        _originalReplay();
         const hide = () => $('#GameScoreLayer').css('display', 'none');
         setTimeout(hide, 10);
         setTimeout(hide, 50);
+        setTimeout(hide, 200);
         setTimeout(hide, 1600);
     };
 });
