@@ -202,16 +202,18 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         _gameScore = 0;
         _gameOver = false;
         _gameStart = false;
+        _gameSettingNum=20;
         _gameTimeNum = _gameSettingNum;
         _gameStartTime = 0;
         
-        lastCell = -1;//**************
+        lastCell = -1;
+        prevRowCells = []; // 重置整行轨道记录
         
         countBlockSize();
         refreshGameLayer(GameLayer[0]);
         refreshGameLayer(GameLayer[1], 1);
         updatePanel();
-    }
+}
 
     function gameStart() {
         _date1 = new Date();
@@ -299,22 +301,22 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
     // 无纵模式开关*******************************************
     let noVerticalMode = cookie('noVerticalMode') ? cookie('noVerticalMode') === '1' : false;
     let lastCell = -1; // 记录上一行音符轨道，避免重复
+    let prevRowCells = []; // 存储上一整行所有音符轨道，过滤整行重复
 
     let _ttreg = / t{1,2}(\d+)/,
         _clearttClsReg = / t{1,2}\d+| bad/;
 
     function refreshGameLayer(box, loop, offset) {
         let targetCell;
-        // 无纵模式：禁止和上一行轨道重复
+        // 无纵模式：排除上一整行所有轨道 + 当前行上一个音符轨道
         if (noVerticalMode) {
             const all = [0,1,2,3];
-            // 过滤掉上一行使用的轨道
-            const avail = all.filter(c => c !== lastCell);
+            // 过滤掉上一行全部音符，保证本行和上一行无任何同列
+            const avail = all.filter(c => c !== lastCell && !prevRowCells.includes(c));
             targetCell = avail[Math.floor(Math.random() * avail.length)];
-            // 更新本行轨道给下一行做判断
             lastCell = targetCell;
+            prevRowCells.push(targetCell); // 存入当前行轨道
         } else {
-            // 原版随机逻辑
             targetCell = Math.floor(Math.random() * 1000) % 4;
         }
         let i = targetCell + (loop ? 0 : 4);
@@ -333,20 +335,21 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
                 });
                 r.className += ' t' + (Math.floor(Math.random() * 1000) % 5 + 1);
                 r.notEmpty = true;
-                // 下一行音符独立随机，不受本行限制
                 i = (Math.floor(j / 4) + 1) * 4 + Math.floor(Math.random() * 1000) % 4;
             } else {
                 r.notEmpty = false;
             }
         }
+        // 换行逻辑：切换行时清空上一行记录
         if (loop) {
+            prevRowCells = []; // 滚动新空白行，重置整行记录
             box.style.webkitTransitionDuration = '0ms';
             box.style.display = 'none';
             box.y = -blockSize * Math.floor(box.children.length / 4) + ((offset || 0)) * blockSize;
             setTimeout(function () {
                 box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
                 setTimeout(function () {
-                    box.style.display = 'block';
+                    box.style.display = 'none';
                 }, 100);
             }, 200);
         } else {
@@ -355,6 +358,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
         }
         box.style[transitionDuration] = '150ms';
     }
+
 
 
 
