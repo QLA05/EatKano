@@ -358,83 +358,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             } else {
                 r.notEmpty = false;
             }
-        }*/
-        
-        function refreshGameLayer(box, loop, offset) {
-            let i;
-            const totalRows = Math.floor(box.children.length / 4);
-        
-            if (noVerticalMode) {
-                if (!noVerticalInitialized) {
-                    lastNoteColumn = -1;
-                    noVerticalInitialized = true;
-                }
-                // 首行严格不等于上一层最后一列
-                let validStartCols = [0,1,2,3].filter(c => c !== lastNoteColumn);
-                const startCol = validStartCols[Math.floor(Math.random() * validStartCols.length)];
-                // 生成首音符后立刻更新全局记录
-                lastNoteColumn = startCol;
-                i = startCol + (loop ? 0 : 4);
-            } else {
-                i = Math.floor(Math.random() * 4) + (loop ? 0 : 4);
-            }
-        
-            for (let j = 0; j < box.children.length; j++) {
-                let r = box.children[j], rstyle = r.style;
-                rstyle.left = (j % 4) * blockSize + 'px';
-                rstyle.bottom = Math.floor(j / 4) * blockSize + 'px';
-                rstyle.width = blockSize + 'px';
-                rstyle.height = blockSize + 'px';
-                r.className = r.className.replace(_clearttClsReg, '');
-        
-                if (i === j) {
-                    const currentCol = i % 4;
-                    _gameBBList.push({
-                        cell: currentCol,
-                        id: r.id
-                    });
-                    r.className += ' t' + (Math.floor(Math.random() * 1000) % 5 + 1);
-                    r.notEmpty = true;
-        
-                    const nextRowIndex = Math.floor(j / 4) + 1;
-                    if (nextRowIndex < totalRows) {
-                        if (noVerticalMode) {
-                            // 下一行强制排除上一行记录的列（也就是currentCol）
-                            const validNext = [0,1,2,3].filter(c => c !== lastNoteColumn);
-                            const nextCol = validNext[Math.floor(Math.random() * validNext.length)];
-                            // 关键：生成下一列立刻覆盖全局记录，循环下一次直接生效
-                            lastNoteColumn = nextCol;
-                            i = nextRowIndex * 4 + nextCol;
-                        } else {
-                            const nextCol = Math.floor(Math.random() * 4);
-                            i = nextRowIndex * 4 + nextCol;
-                        }
-                    }
-                } else {
-                    r.notEmpty = false;
-                }
-            }
-        
-            if (loop) {
-                box.style.webkitTransitionDuration = '0ms';
-                box.style.display = 'none';
-                box.y = -blockSize * (Math.floor(box.children.length / 4) + (offset || 0)) * loop;
-                setTimeout(function () {
-                    box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
-                    setTimeout(function () {
-                        box.style.display = 'block';
-                    }, 100);
-                }, 200);
-            } else {
-                box.y = 0;
-                box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
-            }
-            box.style[transitionDuration] = '150ms';
         }
-
-
-
-        
 
         if (loop) {
             box.style.webkitTransitionDuration = '0ms';
@@ -451,7 +375,84 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
         }
         box.style[transitionDuration] = '150ms';
+    }*/
+
+    function refreshGameLayer(box, loop, offset) {
+        let i;
+        const totalRows = Math.floor(box.children.length / 4);
+        const totalBlocks = box.children.length;
+    
+        if (noVerticalMode) {
+            if (!noVerticalInitialized) {
+                lastNoteColumn = -1;
+                noVerticalInitialized = true;
+            }
+            // 首行过滤上一层最后一列
+            let validStartCols = [0,1,2,3].filter(c => c !== lastNoteColumn);
+            const startCol = validStartCols[Math.floor(Math.random() * validStartCols.length)];
+            lastNoteColumn = startCol;
+            // 修复：非loop图层起始行改为0，不要+4，避免第一行直接空
+            i = startCol + (loop ? 0 : 0);
+        } else {
+            i = Math.floor(Math.random() * 4) + (loop ? 0 : 0);
+        }
+    
+        for (let j = 0; j < totalBlocks; j++) {
+            let r = box.children[j], rstyle = r.style;
+            rstyle.left = (j % 4) * blockSize + 'px';
+            rstyle.bottom = Math.floor(j / 4) * blockSize + 'px';
+            rstyle.width = blockSize + 'px';
+            rstyle.height = blockSize + 'px';
+            r.className = r.className.replace(_clearttClsReg, '');
+            r.notEmpty = false;
+    
+            if (i === j && i < totalBlocks) {
+                const currentCol = i % 4;
+                _gameBBList.push({
+                    cell: currentCol,
+                    id: r.id
+                });
+                r.className += ' t' + (Math.floor(Math.random() * 1000) % 5 + 1);
+                r.notEmpty = true;
+    
+                const nextRowIndex = Math.floor(j / 4) + 1;
+                if (nextRowIndex < totalRows) {
+                    if (noVerticalMode) {
+                        // 强制下一行≠当前列，杜绝紧贴同列00/22
+                        const validNext = [0,1,2,3].filter(c => c !== currentCol);
+                        const nextCol = validNext[Math.floor(Math.random() * validNext.length)];
+                        lastNoteColumn = nextCol;
+                        i = nextRowIndex * 4 + nextCol;
+                    } else {
+                        const nextCol = Math.floor(Math.random() * 4);
+                        i = nextRowIndex * 4 + nextCol;
+                    }
+                } else {
+                    // 当前图层最后一行，保存列给下一层衔接
+                    lastNoteColumn = i % 4;
+                    i = totalBlocks + 99; // 超出范围，停止生成音符
+                }
+            }
+        }
+    
+        // 图层滚动逻辑保留原样
+        if (loop) {
+            box.style.webkitTransitionDuration = '0ms';
+            box.style.display = 'none';
+            box.y = -blockSize * (totalRows + (offset || 0)) * loop;
+            setTimeout(function () {
+                box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
+                setTimeout(function () {
+                    box.style.display = 'block';
+                }, 100);
+            }, 200);
+        } else {
+            box.y = 0;
+            box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
+        }
+        box.style[transitionDuration] = '150ms';
     }
+
 
     function gameLayerMoveNextRow() {
         for (let i = 0; i < GameLayer.length; i++) {
