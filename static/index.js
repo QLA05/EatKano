@@ -25,16 +25,13 @@ let noVerticalInitialized = false;
 
     function refreshNoVerticalMode() {
         const inputDom = document.getElementById("noVerticalMode");
-        // 页面有设置框优先读页面值
         if(inputDom) {
             noVerticalMode = inputDom.value === "1";
         } else {
-            // 没有DOM就读取cookie持久化记录
             const cookieVal = cookie('noVerticalMode');
             noVerticalMode = cookieVal === '1';
         }
     }
-
 
     const I18N = getJsonI18N()
 
@@ -712,6 +709,7 @@ let noVerticalInitialized = false;
         if (!welcomeLayerClosed) {
             return;
         }
+        // 缺少保护：列表为空/下标越界直接读取p.id会崩溃
         let p = _gameBBList[_gameBBListIndex];
         let base = parseInt($(`#${p.id}`).attr("num")) - p.cell;
         let num = base + index - 1;
