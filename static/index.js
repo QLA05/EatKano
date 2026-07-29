@@ -308,7 +308,7 @@ let noVerticalInitialized = false;
     let _ttreg = / t{1,2}(\d+)/,
         _clearttClsReg = / t{1,2}\d+| bad/;
 
-    function refreshGameLayer(box, loop, offset) {
+/*    function refreshGameLayer(box, loop, offset) {
         let i;
         const totalRows = Math.floor(box.children.length / 4);
 
@@ -329,7 +329,7 @@ let noVerticalInitialized = false;
             i = Math.floor(Math.random() * 4) + (loop ? 0 : 4);
         }
 
-        /*for (let j = 0; j < box.children.length; j++) {
+        for (let j = 0; j < box.children.length; j++) {
             let r = box.children[j], rstyle = r.style;
             rstyle.left = (j % 4) * blockSize + 'px';
             rstyle.bottom = Math.floor(j / 4) * blockSize + 'px';
