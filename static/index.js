@@ -25,10 +25,16 @@ let noVerticalInitialized = false;
 
     function refreshNoVerticalMode() {
         const inputDom = document.getElementById("noVerticalMode");
+        // 页面有设置框优先读页面值
         if(inputDom) {
             noVerticalMode = inputDom.value === "1";
+        } else {
+            // 没有DOM就读取cookie持久化记录
+            const cookieVal = cookie('noVerticalMode');
+            noVerticalMode = cookieVal === '1';
         }
     }
+
 
     const I18N = getJsonI18N()
 
