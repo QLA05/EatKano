@@ -457,7 +457,6 @@ let noVerticalInitialized = false;
     }
 
 
-
     function gameLayerMoveNextRow() {
         for (let i = 0; i < GameLayer.length; i++) {
             let g = GameLayer[i];
