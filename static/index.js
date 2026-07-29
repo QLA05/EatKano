@@ -1,4 +1,9 @@
 const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
+// 无纵模式全局开关
+let noVerticalMode = false;
+let lastNoteColumn = -1;
+let noVerticalInitialized = false;
+
 
 (function(w) {
     function getJsonI18N() {
@@ -16,6 +21,13 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             success: data => res = data,
             error: () => alert('找不到语言文件: ' + lang)
         }).responseJSON
+    }
+
+    function refreshNoVerticalMode() {
+        const inputDom = document.getElementById("noVerticalMode");
+        if(inputDom) {
+            noVerticalMode = inputDom.value === "1";
+        }
     }
 
     const I18N = getJsonI18N()
