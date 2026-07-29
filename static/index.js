@@ -323,7 +323,7 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             i = Math.floor(Math.random() * 4) + (loop ? 0 : 4);
         }
 
-        for (let j = 0; j < box.children.length; j++) {
+        /*for (let j = 0; j < box.children.length; j++) {
             let r = box.children[j], rstyle = r.style;
             rstyle.left = (j % 4) * blockSize + 'px';
             rstyle.bottom = Math.floor(j / 4) * blockSize + 'px';
@@ -358,7 +358,83 @@ const MODE_NORMAL = 1, MODE_ENDLESS = 2, MODE_PRACTICE = 3;
             } else {
                 r.notEmpty = false;
             }
+        }*/
+        
+        function refreshGameLayer(box, loop, offset) {
+            let i;
+            const totalRows = Math.floor(box.children.length / 4);
+        
+            if (noVerticalMode) {
+                if (!noVerticalInitialized) {
+                    lastNoteColumn = -1;
+                    noVerticalInitialized = true;
+                }
+                // 首行严格不等于上一层最后一列
+                let validStartCols = [0,1,2,3].filter(c => c !== lastNoteColumn);
+                const startCol = validStartCols[Math.floor(Math.random() * validStartCols.length)];
+                // 生成首音符后立刻更新全局记录
+                lastNoteColumn = startCol;
+                i = startCol + (loop ? 0 : 4);
+            } else {
+                i = Math.floor(Math.random() * 4) + (loop ? 0 : 4);
+            }
+        
+            for (let j = 0; j < box.children.length; j++) {
+                let r = box.children[j], rstyle = r.style;
+                rstyle.left = (j % 4) * blockSize + 'px';
+                rstyle.bottom = Math.floor(j / 4) * blockSize + 'px';
+                rstyle.width = blockSize + 'px';
+                rstyle.height = blockSize + 'px';
+                r.className = r.className.replace(_clearttClsReg, '');
+        
+                if (i === j) {
+                    const currentCol = i % 4;
+                    _gameBBList.push({
+                        cell: currentCol,
+                        id: r.id
+                    });
+                    r.className += ' t' + (Math.floor(Math.random() * 1000) % 5 + 1);
+                    r.notEmpty = true;
+        
+                    const nextRowIndex = Math.floor(j / 4) + 1;
+                    if (nextRowIndex < totalRows) {
+                        if (noVerticalMode) {
+                            // 下一行强制排除上一行记录的列（也就是currentCol）
+                            const validNext = [0,1,2,3].filter(c => c !== lastNoteColumn);
+                            const nextCol = validNext[Math.floor(Math.random() * validNext.length)];
+                            // 关键：生成下一列立刻覆盖全局记录，循环下一次直接生效
+                            lastNoteColumn = nextCol;
+                            i = nextRowIndex * 4 + nextCol;
+                        } else {
+                            const nextCol = Math.floor(Math.random() * 4);
+                            i = nextRowIndex * 4 + nextCol;
+                        }
+                    }
+                } else {
+                    r.notEmpty = false;
+                }
+            }
+        
+            if (loop) {
+                box.style.webkitTransitionDuration = '0ms';
+                box.style.display = 'none';
+                box.y = -blockSize * (Math.floor(box.children.length / 4) + (offset || 0)) * loop;
+                setTimeout(function () {
+                    box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
+                    setTimeout(function () {
+                        box.style.display = 'block';
+                    }, 100);
+                }, 200);
+            } else {
+                box.y = 0;
+                box.style[transform] = 'translate3D(0,' + box.y + 'px,0)';
+            }
+            box.style[transitionDuration] = '150ms';
         }
+
+
+
+        
 
         if (loop) {
             box.style.webkitTransitionDuration = '0ms';
