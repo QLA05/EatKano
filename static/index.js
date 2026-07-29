@@ -200,15 +200,6 @@ let noVerticalInitialized = false;
         gameRestart();
     }
 
-    // ========== 无纵连模式全局状态 ==========
-    let noVerticalMode = false;
-    let lastNoteColumn = -1;
-    let noVerticalInitialized = false;
-
-    function refreshNoVerticalMode() {
-        const cookieVal = cookie('noVerticalMode');
-        noVerticalMode = cookieVal === '1';
-    }
 
     function gameRestart() {
         _gameBBList = [];
